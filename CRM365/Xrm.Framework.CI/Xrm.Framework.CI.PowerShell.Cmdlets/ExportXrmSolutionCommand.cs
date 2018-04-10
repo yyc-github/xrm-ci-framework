@@ -159,11 +159,6 @@ namespace Xrm.Framework.CI.PowerShell.Cmdlets
                 solutionFile.Append(solution.Version.Replace(".", "_"));
             }
 
-            if (Managed)
-            {
-                solutionFile.Append("_managed");
-            }
-
             solutionFile.Append(".zip");
 
             var exportSolutionRequest = new ExportSolutionRequest

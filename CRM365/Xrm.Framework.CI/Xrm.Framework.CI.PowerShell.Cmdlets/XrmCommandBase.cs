@@ -4,6 +4,9 @@ using Microsoft.Xrm.Tooling.Connector;
 using System.Configuration;
 using System.Threading;
 using System;
+using System.Net;
+using System.ServiceModel.Description;
+using Microsoft.Xrm.Sdk.Client;
 
 namespace Xrm.Framework.CI.PowerShell.Cmdlets
 {
@@ -15,11 +18,12 @@ namespace Xrm.Framework.CI.PowerShell.Cmdlets
         private TimeSpan ConnectPolingInterval = TimeSpan.FromSeconds(15);
         private int ConnectRetryCount = 3;
 
-        /// <summary>
-        /// <para type="description">The connectionstring to the crm organization (see https://msdn.microsoft.com/en-us/library/mt608573.aspx ).</para>
-        /// </summary>
         [Parameter(Mandatory = true)]
-        public string ConnectionString { get; set; }
+        public string Username { get; set; }
+        [Parameter(Mandatory = true)]
+        public string Password { get; set; }
+        [Parameter(Mandatory = true)]
+        public string EndPoint { get; set; }
 
         /// <summary>
         /// <para type="description">Timeout in seconds</para>
@@ -31,32 +35,26 @@ namespace Xrm.Framework.CI.PowerShell.Cmdlets
         {
             base.BeginProcessing();
 
-            for (int i = 1; i <= ConnectRetryCount; i++)
+            try
             {
-                WriteVerbose(string.Format("Connecting to CRM [attempt {0}]", i));
-                ServiceClient = new CrmServiceClient(ConnectionString);
+                var crmEndPoint = new Uri(EndPoint);
+                var manager = ServiceConfigurationFactory.CreateManagement<IOrganizationService>(crmEndPoint);
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                if (ServiceClient != null && ServiceClient.IsReady)
-                {
-                    if (Timeout == 0)
-                    {
-                        ServiceClient.OrganizationServiceProxy.Timeout = new System.TimeSpan(0, 0, DefaultTime);
-                    }
-                    else
-                    {
-                        ServiceClient.OrganizationServiceProxy.Timeout = new System.TimeSpan(0, 0, Timeout);
-                    }
-                    OrganizationService = ServiceClient;
-                    return;
-                }
-                else
-                {
-                    if (i != ConnectRetryCount)
-                        Thread.Sleep(ConnectPolingInterval);
-                }
+                var credentials = new ClientCredentials();
+                credentials.Windows.ClientCredential = new NetworkCredential(Username, Password);
+
+                var proxy = new OrganizationServiceProxy(manager.CurrentServiceEndpoint.ListenUri, null, credentials,
+                    null);
+                proxy.Timeout = new TimeSpan(0, 0, Timeout == 0 ? DefaultTime : Timeout);
+                proxy.EnableProxyTypes();
+                OrganizationService = proxy;
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Unable to connect to CRM on endpoint: ${EndPoint}");
             }
 
-            throw new Exception(string.Format("Couldn't connect to CRM instance after {0} attempts: {1}", ConnectRetryCount, ServiceClient?.LastCrmError));
         }
 
         protected override void EndProcessing()
