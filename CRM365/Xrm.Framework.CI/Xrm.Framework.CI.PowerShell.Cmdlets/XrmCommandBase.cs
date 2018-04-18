@@ -1,6 +1,5 @@
 ﻿using System.Management.Automation;
 using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Tooling.Connector;
 using System.Configuration;
 using System.Threading;
 using System;
@@ -13,7 +12,6 @@ namespace Xrm.Framework.CI.PowerShell.Cmdlets
     public abstract class XrmCommandBase : Cmdlet
     {
         protected IOrganizationService OrganizationService;
-        protected CrmServiceClient ServiceClient;
         private int DefaultTime = 120;
         private TimeSpan ConnectPolingInterval = TimeSpan.FromSeconds(15);
         private int ConnectRetryCount = 3;
@@ -37,9 +35,10 @@ namespace Xrm.Framework.CI.PowerShell.Cmdlets
 
             try
             {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
                 var crmEndPoint = new Uri(EndPoint);
                 var manager = ServiceConfigurationFactory.CreateManagement<IOrganizationService>(crmEndPoint);
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
                 var credentials = new ClientCredentials();
                 credentials.Windows.ClientCredential = new NetworkCredential(Username, Password);
@@ -60,9 +59,6 @@ namespace Xrm.Framework.CI.PowerShell.Cmdlets
         protected override void EndProcessing()
         {
             base.EndProcessing();
-
-            if (ServiceClient != null)
-                ServiceClient.Dispose();
         }
     }
 }
